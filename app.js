@@ -1,40 +1,383 @@
-const $=id=>document.getElementById(id);
-async function api(url,opt){const r=await fetch(url,{headers:{"Content-Type":"application/json"},...opt});const d=await r.json();if(!r.ok)throw new Error(d.error||"Request failed");return d}
-function show(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");if(id==="plans")loadPlans();if(id==="portal")loadSubs();if(id==="admin")loadAdmin()}
-async function loadPlans(){
- const plans=await api("/api/plans"); $("planGrid").innerHTML=plans.map(p=>`
- <div class="plan"><span class="tag">${p.billing_cycle}</span><h3>${p.name}</h3>
- <div class="price">₹${p.price}<small> / ${p.billing_cycle}</small></div>
- <ul>${p.features.map(f=>`<li>${f}</li>`).join("")}</ul>
- <button class="primary" onclick="choose(${p.id})">Choose ${p.name}</button></div>`).join("");
+const $ = id => document.getElementById(id);
+
+async function api(url, options = {}) {
+  const response = await fetch(url, options);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Something went wrong");
+  }
+
+  return data;
 }
-function choose(id){$("portalPlan").value=id;show("portal");}
-async function createCustomer(){
- try{const d=await api("/api/customers",{method:"POST",body:JSON.stringify({name:"Demo Customer",email:"demo"+Date.now()+"@example.com"})});$("customerId").value=d.id;$("portalMsg").textContent="Customer created. ID: "+d.id}
- catch(e){$("portalMsg").textContent=e.message}
+
+/* =========================
+   LOAD TEAMS
+========================= */
+
+async function loadTeams() {
+  try {
+    const teams = await api("/api/teams");
+
+    const teamSelect = $("playerTeam");
+    const viewSelect = $("viewTeam");
+    const teamsList = $("teamsList");
+
+    teamSelect.innerHTML =
+      '<option value="">Select Team</option>';
+
+    viewSelect.innerHTML =
+      '<option value="">Select Team</option>';
+
+    if (teams.length === 0) {
+      teamsList.innerHTML = "<p>No teams added yet.</p>";
+      return;
+    }
+
+    teamsList.innerHTML = teams.map(team => `
+      <div class="row">
+        <div>
+          <b>🏏 ${team.name}</b>
+          <br>
+          👑 Captain: ${team.captain_name}
+          <br>
+          📱 ${team.captain_phone}
+        </div>
+
+        <div class="actions">
+          <button onclick="deleteTeam('${team._id}')">
+            🗑️ Delete
+          </button>
+        </div>
+      </div>
+    `).join("");
+
+    teams.forEach(team => {
+      teamSelect.innerHTML += `
+        <option value="${team._id}">
+          ${team.name}
+        </option>
+      `;
+
+      viewSelect.innerHTML += `
+        <option value="${team._id}">
+          ${team.name}
+        </option>
+      `;
+    });
+
+  } catch (error) {
+    console.error(error);
+    $("teamsList").innerHTML =
+      "<p>Failed to load teams.</p>";
+  }
 }
-async function subscribe(){
- try{const d=await api("/api/subscriptions",{method:"POST",body:JSON.stringify({customer_id:Number($("customerId").value),plan_id:Number($("portalPlan").value)})});$("portalMsg").textContent="Subscription created: #"+d.id+" ("+d.status+")";loadSubs()}
- catch(e){$("portalMsg").textContent=e.message}
+
+
+/* =========================
+   CREATE TEAM
+========================= */
+
+$("teamForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  try {
+
+    await api("/api/teams", {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        name: $("teamName").value,
+        captain_name: $("captainName").value,
+        captain_phone: $("captainPhone").value
+      })
+    });
+
+    $("teamForm").reset();
+
+    alert("Team created successfully!");
+
+    loadTeams();
+
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+
+/* =========================
+   DELETE TEAM
+========================= */
+
+async function deleteTeam(id) {
+
+  if (!confirm("Delete this team and all players?")) {
+    return;
+  }
+
+  try {
+
+    await api("/api/teams/" + id, {
+      method: "DELETE"
+    });
+
+    alert("Team deleted successfully!");
+
+    loadTeams();
+
+    $("playersList").innerHTML =
+      "<p>Select a team to see players.</p>";
+
+  } catch (error) {
+    alert(error.message);
+  }
 }
-async function cancelSub(){
- const rows=await api("/api/subscriptions");const mine=rows.find(x=>x.customer_id==Number($("customerId").value));
- if(!mine){$("portalMsg").textContent="No subscription found";return}
- await api("/api/subscriptions/"+mine.id,{method:"PATCH",body:JSON.stringify({status:"canceled"})});
- $("portalMsg").textContent="Subscription canceled.";loadSubs()
+
+
+/* =========================
+   ADD PLAYER
+========================= */
+
+$("playerForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  try {
+
+    const teamId = $("playerTeam").value;
+
+    if (!teamId) {
+      alert("Please select a team");
+      return;
+    }
+
+    await api("/api/players", {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        team_id: teamId,
+        name: $("playerName").value,
+        phone: $("playerPhone").value,
+        age: Number($("playerAge").value),
+        village: $("playerVillage").value
+      })
+    });
+
+    $("playerForm").reset();
+
+    alert("Player added successfully!");
+
+    loadPlayers(teamId);
+
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+
+/* =========================
+   LOAD PLAYERS
+========================= */
+
+$("viewTeam").addEventListener("change", e => {
+
+  const teamId = e.target.value;
+
+  if (teamId) {
+    loadPlayers(teamId);
+  } else {
+    $("playersList").innerHTML =
+      "<p>Select a team to see players.</p>";
+  }
+
+});
+
+
+async function loadPlayers(teamId) {
+
+  try {
+
+    const players =
+      await api("/api/players?team_id=" + teamId);
+
+    if (players.length === 0) {
+      $("playersList").innerHTML =
+        "<p>No players added yet.</p>";
+
+      return;
+    }
+
+    $("playersList").innerHTML =
+      players.map(player => `
+
+      <div class="row">
+
+        <div>
+
+          <b>👤 ${player.name}</b>
+
+          <br>
+
+          📱 ${player.phone}
+
+          <br>
+
+          🎂 Age: ${player.age}
+
+          <br>
+
+          🏠 ${player.village}
+
+        </div>
+
+        <div class="actions">
+
+          <button onclick="openEditModal('${player._id}')">
+            ✏️ Edit
+          </button>
+
+          <button onclick="deletePlayer('${player._id}')">
+            🗑️ Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    `).join("");
+
+  } catch (error) {
+
+    $("playersList").innerHTML =
+      "<p>Failed to load players.</p>";
+
+  }
+
 }
-async function loadSubs(){const rows=await api("/api/subscriptions");$("subscriptions").innerHTML=rows.slice(0,10).map(x=>`
-<div class="row"><span><b>#${x.id} ${x.customer_name}</b><br>${x.plan_name} · ₹${x.price}</span><span class="tag">${x.status}</span></div>`).join("")||"No subscriptions yet."}
-async function loadAdmin(){
- const d=await api("/api/dashboard");$("stats").innerHTML=[
- ["Active subscriptions",d.active],["Trials",d.trials],["Revenue","₹"+Number(d.revenue).toFixed(2)],["Canceled",d.churn]
- ].map(x=>`<div class="stat"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
- const plans=await api("/api/plans");$("adminPlans").innerHTML=plans.map(p=>`<div class="row"><span>${p.name}</span><b>₹${p.price}</b></div>`).join("");
- const inv=await api("/api/invoices");$("invoices").innerHTML=inv.map(i=>`<div class="row"><span>#${i.id} ${i.customer_name}<br>${i.plan_name}</span><span>₹${i.amount}<br><small>${i.status}</small></span></div>`).join("")||"No invoices yet.";
+
+
+/* =========================
+   DELETE PLAYER
+========================= */
+
+async function deletePlayer(id) {
+
+  if (!confirm("Delete this player?")) {
+    return;
+  }
+
+  try {
+
+    await api("/api/players/" + id, {
+      method: "DELETE"
+    });
+
+    const teamId = $("viewTeam").value;
+
+    if (teamId) {
+      loadPlayers(teamId);
+    }
+
+  } catch (error) {
+    alert(error.message);
+  }
+
 }
-async function createPlan(){
- try{await api("/api/plans",{method:"POST",body:JSON.stringify({name:$("newName").value,price:Number($("newPrice").value),billing_cycle:$("newCycle").value,features:$("newFeatures").value.split(",").map(x=>x.trim()).filter(Boolean)})});$("newName").value="";$("newPrice").value="";$("newFeatures").value="";loadAdmin();loadPlans()}
- catch(e){alert(e.message)}
+
+
+/* =========================
+   EDIT PLAYER
+========================= */
+
+async function openEditModal(id) {
+
+  try {
+
+    const player =
+      await api("/api/players/" + id);
+
+    $("editPlayerId").value = player._id;
+
+    $("editName").value = player.name;
+    $("editPhone").value = player.phone;
+    $("editAge").value = player.age;
+    $("editVillage").value = player.village;
+
+    $("editModal").style.display = "block";
+
+  } catch (error) {
+    alert(error.message);
+  }
+
 }
-async function seed(){await api("/api/demo/seed",{method:"POST"});loadAdmin();loadSubs()}
-loadPlans();
+
+
+function closeEditModal() {
+
+  $("editModal").style.display = "none";
+
+}
+
+
+$("editPlayerForm").addEventListener("submit", async e => {
+
+  e.preventDefault();
+
+  const id = $("editPlayerId").value;
+
+  try {
+
+    await api("/api/players/" + id, {
+
+      method: "PUT",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+
+        name: $("editName").value,
+
+        phone: $("editPhone").value,
+
+        age: Number($("editAge").value),
+
+        village: $("editVillage").value
+
+      })
+
+    });
+
+    closeEditModal();
+
+    const teamId = $("viewTeam").value;
+
+    if (teamId) {
+      loadPlayers(teamId);
+    }
+
+    alert("Player updated successfully!");
+
+  } catch (error) {
+
+    alert(error.message);
+
+  }
+
+});
+
+
+/* =========================
+   START
+========================= */
+
+loadTeams();
