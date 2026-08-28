@@ -8,29 +8,24 @@ const app = express();
 const db = new Database("tournament.db");
 const port = process.env.PORT || 3000;
 
-// Upload folder
 const dir = path.join(__dirname, "public", "uploads");
 fs.mkdirSync(dir, { recursive: true });
 
-// Multer setup
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const name = Date.now() + "-" +
-        file.originalname.replace(/[^a-z0-9.]/gi, "_");
-      cb(null, name);
-    }
-  })
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname.replace(/[^a-zA-Z0-9.]/g, "_"));
+  }
 });
+
+const upload = multer({ storage: storage });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Database tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS teams (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,25 +43,22 @@ db.exec(`
     age INTEGER,
     village TEXT,
     photo TEXT,
-    created_at TEXT,
-    FOREIGN KEY(team_id) REFERENCES teams(id)
+    created_at TEXT
   );
 `);
 
-// Get all teams
-app.get("/api/teams", (req, res) => {
-  const teams = db
-    .prepare("SELECT * FROM teams ORDER BY id DESC")
-    .all();
+app.get("/api/teams", function (req, res) {
+  const teams = db.prepare(
+    "SELECT * FROM teams ORDER BY id DESC"
+  ).all();
 
   res.json(teams);
 });
 
-// Get one team with players
-app.get("/api/teams/:id", (req, res) => {
-  const team = db
-    .prepare("SELECT * FROM teams WHERE id = ?")
-    .get(req.params.id);
+app.get("/api/teams/:id", function (req, res) {
+  const team = db.prepare(
+    "SELECT * FROM teams WHERE id = ?"
+  ).get(req.params.id);
 
   if (!team) {
     return res.status(404).json({
@@ -74,16 +66,17 @@ app.get("/api/teams/:id", (req, res) => {
     });
   }
 
-  team.players = db
-    .prepare("SELECT * FROM players WHERE team_id = ? ORDER BY id")
-    .all(team.id);
+  team.players = db.prepare(
+    "SELECT * FROM players WHERE team_id = ? ORDER BY id"
+  ).all(team.id);
 
   res.json(team);
 });
 
-// Create team
-app.post("/api/teams", (req, res) => {
-  const { name, captain, phone } = req.body;
+app.post("/api/teams", function (req, res) {
+  const name = req.body.name;
+  const captain = req.body.captain;
+  const phone = req.body.phone;
 
   if (!name || !captain || !phone) {
     return res.status(400).json({
@@ -92,22 +85,18 @@ app.post("/api/teams", (req, res) => {
   }
 
   try {
-    const result = db
-      .prepare(`
-        INSERT INTO teams(name, captain, phone, created_at)
-        VALUES (?, ?, ?, ?)
-      `)
-      .run(
-        name,
-        captain,
-        phone,
-        new Date().toISOString()
-      );
+    const result = db.prepare(
+      "INSERT INTO teams (name, captain, phone, created_at) VALUES (?, ?, ?, ?)"
+    ).run(
+      name,
+      captain,
+      phone,
+      new Date().toISOString()
+    );
 
     res.json({
       id: result.lastInsertRowid
     });
-
   } catch (error) {
     res.status(409).json({
       error: "Team already exists"
@@ -115,8 +104,7 @@ app.post("/api/teams", (req, res) => {
   }
 });
 
-// Delete team
-app.delete("/api/teams/:id", (req, res) => {
+app.delete("/api/teams/:id", function (req, res) {
   db.prepare(
     "DELETE FROM players WHERE team_id = ?"
   ).run(req.params.id);
@@ -128,23 +116,19 @@ app.delete("/api/teams/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// Add player
 app.post(
   "/api/players",
   upload.single("photo"),
-  (req, res) => {
+  function (req, res) {
+    const teamId = req.body.team_id;
+    const name = req.body.name;
+    const phone = req.body.phone;
+    const age = req.body.age;
+    const village = req.body.village;
 
-    const {
-      team_id,
-      name,
-      phone,
-      age,
-      village
-    } = req.body;
-
-    const team = db
-      .prepare("SELECT * FROM teams WHERE id = ?")
-      .get(team_id);
+    const team = db.prepare(
+      "SELECT * FROM teams WHERE id = ?"
+    ).get(teamId);
 
     if (!team) {
       return res.status(404).json({
@@ -152,53 +136,91 @@ app.post(
       });
     }
 
-    const count = db
-      .prepare(
-        "SELECT COUNT(*) AS count FROM players WHERE team_id = ?"
-      )
-      .get(team_id).count;
+    const result = db.prepare(
+      "SELECT COUNT(*) AS count FROM players WHERE team_id = ?"
+    ).get(teamId);
 
-    if (count >= 15) {
+    if (result.count >= 15) {
       return res.status(400).json({
         error: "Maximum 15 players reached"
       });
     }
 
-    if (
-      !name ||
-      !phone ||
-      !age ||
-      !village ||
-      !req.file
-    ) {
+    if (!name || !phone || !age || !village || !req.file) {
       return res.status(400).json({
         error: "Fill all fields and choose a photo"
       });
     }
 
-    const result = db
-      .prepare(`
-        INSERT INTO players
-        (team_id, name, phone, age, village, photo, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        team_id,
-        name,
-        phone,
-        age,
-        village,
-        "/uploads/" + req.file.filename,
-        new Date().toISOString()
-      );
+    const photo = "/uploads/" + req.file.filename;
+
+    const insert = db.prepare(
+      "INSERT INTO players (team_id, name, phone, age, village, photo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      teamId,
+      name,
+      phone,
+      age,
+      village,
+      photo,
+      new Date().toISOString()
+    );
 
     res.json({
-      id: result.lastInsertRowid
+      id: insert.lastInsertRowid
     });
   }
 );
 
-// Edit player within 24 hours
 app.patch(
   "/api/players/:id",
-  upload.single("photo
+  upload.single("photo"),
+  function (req, res) {
+    const player = db.prepare(
+      "SELECT * FROM players WHERE id = ?"
+    ).get(req.params.id);
+
+    if (!player) {
+      return res.status(404).json({
+        error: "Player not found"
+      });
+    }
+
+    const createdTime = new Date(player.created_at).getTime();
+
+    if (Date.now() - createdTime > 86400000) {
+      return res.status(403).json({
+        error: "Edit locked after 24 hours"
+      });
+    }
+
+    const photo = req.file
+      ? "/uploads/" + req.file.filename
+      : player.photo;
+
+    db.prepare(
+      "UPDATE players SET name = ?, phone = ?, age = ?, village = ?, photo = ? WHERE id = ?"
+    ).run(
+      req.body.name,
+      req.body.phone,
+      req.body.age,
+      req.body.village,
+      photo,
+      req.params.id
+    );
+
+    res.json({ ok: true });
+  }
+);
+
+app.delete("/api/players/:id", function (req, res) {
+  db.prepare(
+    "DELETE FROM players WHERE id = ?"
+  ).run(req.params.id);
+
+  res.json({ ok: true });
+});
+
+app.listen(port, function () {
+  console.log("Server running on port " + port);
+});
