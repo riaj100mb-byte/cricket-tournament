@@ -1,69 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Subscriptly — Subscription Management</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cricket Tournament</title>
+
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-<header>
-  <div class="brand">Subscriptly</div>
-  <nav>
-    <button onclick="show('plans')">Plans</button>
-    <button onclick="show('portal')">Customer Portal</button>
-    <button onclick="show('admin')">Admin Dashboard</button>
-  </nav>
-</header>
 
-<main>
-<section id="plans" class="page active">
-  <div class="hero">
-    <span class="badge">SUBSCRIPTION MANAGEMENT SYSTEM</span>
-    <h1>Simple billing.<br><span>Powerful subscriptions.</span></h1>
-    <p>Create plans, manage subscribers, automate renewals and track revenue from one dashboard.</p>
-  </div>
-  <div id="planGrid" class="plans"></div>
-</section>
+  <header>
+    <h1>🏏 Cricket Tournament</h1>
+    <p>Team & Player Registration</p>
+  </header>
 
-<section id="portal" class="page">
-  <div class="section-head"><h2>Customer Portal</h2><p>Manage your subscription without contacting support.</p></div>
-  <div class="card">
-    <label>Customer ID</label><input id="customerId" type="number" value="1">
-    <label>Plan ID</label><input id="portalPlan" type="number" value="1">
-    <div class="actions">
-      <button onclick="createCustomer()">Create Demo Customer</button>
-      <button class="primary" onclick="subscribe()">Subscribe / Upgrade</button>
-      <button onclick="cancelSub()">Cancel Subscription</button>
+  <main>
+
+    <!-- TEAM FORM -->
+    <section class="card">
+      <h2>➕ Add Team</h2>
+
+      <form id="teamForm">
+
+        <input
+          type="text"
+          id="teamName"
+          placeholder="🏏 Team Name"
+          required
+        >
+
+        <input
+          type="text"
+          id="captainName"
+          placeholder="👑 Captain Name"
+          required
+        >
+
+        <input
+          type="tel"
+          id="captainPhone"
+          placeholder="📱 Captain Phone Number"
+          required
+        >
+
+        <button type="submit">
+          ➕ Add Team
+        </button>
+
+      </form>
+    </section>
+
+
+    <!-- PLAYER FORM -->
+    <section class="card">
+
+      <h2>👤 Add Player</h2>
+
+      <form id="playerForm">
+
+        <select id="playerTeam" required>
+          <option value="">Select Team</option>
+        </select>
+
+        <input
+          type="text"
+          id="playerName"
+          placeholder="Player Name"
+          required
+        >
+
+        <input
+          type="tel"
+          id="playerPhone"
+          placeholder="Phone Number"
+          required
+        >
+
+        <input
+          type="number"
+          id="playerAge"
+          placeholder="Age"
+          min="1"
+          required
+        >
+
+        <input
+          type="text"
+          id="playerVillage"
+          placeholder="Village"
+          required
+        >
+
+        <label>📸 Player Photo</label>
+
+        <input
+          type="file"
+          id="playerPhoto"
+          accept="image/*"
+        >
+
+        <button type="submit">
+          ➕ Add Player
+        </button>
+
+      </form>
+
+    </section>
+
+
+    <!-- TEAMS -->
+    <section class="card">
+
+      <h2>🏆 All Teams</h2>
+
+      <div id="teamsContainer">
+        <p>Loading teams...</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- EDIT PLAYER MODAL -->
+  <div id="editModal" class="modal">
+
+    <div class="modal-content">
+
+      <span id="closeModal">&times;</span>
+
+      <h2>✏️ Edit Player</h2>
+
+      <form id="editPlayerForm">
+
+        <input type="hidden" id="editPlayerId">
+
+        <input
+          type="text"
+          id="editPlayerName"
+          placeholder="Player Name"
+          required
+        >
+
+        <input
+          type="tel"
+          id="editPlayerPhone"
+          placeholder="Phone Number"
+          required
+        >
+
+        <input
+          type="number"
+          id="editPlayerAge"
+          placeholder="Age"
+          required
+        >
+
+        <input
+          type="text"
+          id="editPlayerVillage"
+          placeholder="Village"
+          required
+        >
+
+        <input
+          type="file"
+          id="editPlayerPhoto"
+          accept="image/*"
+        >
+
+        <button type="submit">
+          💾 Save Changes
+        </button>
+
+      </form>
+
     </div>
-    <pre id="portalMsg"></pre>
-  </div>
-  <div class="card">
-    <h3>Subscription status</h3>
-    <div id="subscriptions"></div>
-  </div>
-</section>
 
-<section id="admin" class="page">
-  <div class="section-head"><h2>Admin Dashboard</h2><p>Monitor subscriptions, billing and revenue.</p></div>
-  <div class="stats" id="stats"></div>
-  <div class="grid2">
-    <div class="card"><h3>Plans</h3><div id="adminPlans"></div></div>
-    <div class="card"><h3>Invoices</h3><div id="invoices"></div></div>
   </div>
-  <div class="card">
-    <h3>Create Plan</h3>
-    <div class="formgrid">
-      <input id="newName" placeholder="Plan name">
-      <input id="newPrice" type="number" placeholder="Price">
-      <select id="newCycle"><option>monthly</option><option>yearly</option></select>
-      <input id="newFeatures" placeholder="Features, comma separated">
-    </div>
-    <button class="primary" onclick="createPlan()">Create Plan</button>
-    <button onclick="seed()">Load Demo Data</button>
-  </div>
-</section>
-</main>
-<script src="app.js"></script>
+
+
+  <script src="app.js"></script>
+
 </body>
 </html>
